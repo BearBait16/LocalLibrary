@@ -20,14 +20,14 @@ QLabel#ErrorMessage {
     color: #b00020;
 }
 
-QFrame#BookTile, QFrame#SourceCard {
+QFrame#BookTile {
     background: #ffffff;
     border: 1px solid #c8c8c8;
     border-radius: 6px;
     padding: 4px;
 }
 
-QFrame#BookTile:hover, QFrame#SourceCard:hover {
+QFrame#BookTile:hover {
     border-color: #4a7bd0;
 }
 
@@ -114,28 +114,63 @@ QLabel#TileTitle {
     font-weight: bold;
 }
 
-QLabel#CardType {
-    color: #555555;
-    font-size: 9pt;
-    text-transform: uppercase;
+/* --- Source spines (Search results, picks, Research strip, Similar Sources) --- */
+QWidget#SourceShelf {
+    background: transparent;
 }
 
-QLabel#CardReason {
-    color: #333333;
-}
-
-QLabel#CardStatus {
-    color: #2e7d32;
-    font-size: 9pt;
-}
-
-QLabel#CardStatus[error="true"] {
-    color: #b00020;
-}
-
-QPushButton#CardRemove {
+QFrame#SourceShelfBoard {
+    background: #5c3a1a;
     border: none;
-    padding: 0 4px;
+    border-top: 2px solid #7a5230;
+}
+
+QLabel#SpineTypeCap {
+    color: #ffffff;
+    font-size: 7pt;
+    font-weight: bold;
+    border: 1px solid rgba(0, 0, 0, 90);
+    border-radius: 2px;
+    min-height: 14px;
+    max-height: 14px;
+}
+
+QLabel#SpineTypeCap[sourceType="textbook"] { background: #2f5d8a; }
+QLabel#SpineTypeCap[sourceType="research_paper"] { background: #6b4a8a; }
+QLabel#SpineTypeCap[sourceType="web_article"] { background: #2e7d5b; }
+
+QFrame#ShelfSpine[error="true"] {
+    border: 3px solid #e53935;
+}
+
+QProgressBar#SpineProgress {
+    background: rgba(0, 0, 0, 120);
+    border: none;
+    border-radius: 3px;
+}
+
+QProgressBar#SpineProgress::chunk {
+    background: #8bd17c;
+    border-radius: 3px;
+}
+
+QPushButton#SpineRemove {
+    color: #ffffff;
+    background: rgba(0, 0, 0, 140);
+    border: none;
+    border-radius: 9px;
+    font-size: 8pt;
+    padding: 0;
+}
+
+QPushButton#SpineRemove:hover {
+    background: #e53935;
+}
+
+QLabel#SpineDetails {
+    color: #333333;
+    font-size: 10pt;
+    min-height: 36px;
 }
 
 QFrame#DropZone {
@@ -242,27 +277,7 @@ QWidget#LibraryPage QLabel#PageHeading {
     padding: 4px 12px;
 }
 
-/* --- Research page: source tiles, covers, type badges, Now reading --- */
-QFrame#SourceTile {
-    background: #ffffff;
-    border: 1px solid #c8c8c8;
-    border-radius: 6px;
-}
-
-QFrame#SourceTile:hover {
-    border-color: #4a7bd0;
-}
-
-QFrame#SourceTile[selected="true"] {
-    border: 2px solid #4a7bd0;
-    background: #eef3fc;
-}
-
-QLabel#SourceTileTitle {
-    font-size: 9pt;
-    font-weight: bold;
-}
-
+/* --- Research page: covers, type badges, Now reading --- */
 QLabel#SourceCover {
     border: 1px solid rgba(0, 0, 0, 60);
     background: #ffffff;

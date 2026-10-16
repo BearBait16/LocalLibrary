@@ -56,3 +56,13 @@ def test_duplicate_drop_ignored_and_remove(page):
     assert list(page.chosen) == [1]
     page.remove_source(1)
     assert not page.chosen and not page.done_button.isEnabled()
+
+
+def test_picks_are_spines_on_the_picks_shelf(page):
+    page.add_source(1)
+    page.add_source(2)
+    assert page.picks.spines() == [page.chosen[1], page.chosen[2]]
+    page._ingest_failed(2, page.chosen[2], "boom")
+    assert page.chosen[2].property("error") is True and "boom" in page.error.text()
+    page.remove_source(2)
+    assert page.picks.spines() == [page.chosen[1]]

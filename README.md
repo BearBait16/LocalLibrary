@@ -56,15 +56,17 @@ books, titles and descriptions only) in the background. The status bar shows pro
    a picture behind the bookcase. Each shelf holds 10 books, so the bookcase holds 40. When it's
    full, delete a book to make room for new research.
 2. **Search**: type a topic and press **Search**. Gemma picks a starting textbook and related
-   open-access papers, each with a one-line reason. If a Gemini key is set, tick **Also search the
-   web with Gemini** for outside sources. Drag the sources you want into **Drag here!** (or
-   double-click them). Sources that aren't downloaded yet are downloaded and indexed, with progress
-   shown on the card. Press **Done** to save the book and start reading.
-3. **Research**: read PDFs (or web articles, one section per page). Each source in the left strip
-   shows its cover and a type badge, and the "Now reading" bar above the page says which source and
-   page you're on. Your source and page are saved as you go. **RAG query** opens a question box: answers come only from this book's sources and
-   link to the pages to look at. **Similar Sources** lists related material; drag one onto the page
-   to add it to the book.
+   open-access papers, shown as books on a shelf (the cap at the bottom says Textbook, Paper or Web).
+   Click a book to see Gemma's one-line reason for picking it. If a Gemini key is set, tick **Also
+   search the web with Gemini** for outside sources. Drag the books you want into **Drag here!** (or
+   double-click them). Sources that aren't downloaded yet are downloaded and indexed, with a progress
+   bar on the book; a red outline means the download failed. Press **Done** to save the book and
+   start reading.
+3. **Research**: read PDFs (or web articles, one section per page). The left shelf holds this book's
+   sources (hover one to see its cover), and the "Now reading" bar above the page says which source
+   and page you're on. Your source and page are saved as you go. **RAG query** opens a question box:
+   answers come only from this book's sources and link to the pages to look at. **Similar Sources**
+   shows related material as books; drag one onto the page to add it to the book.
 
 The first search or question after starting can take about a minute while Ollama loads Gemma.
 After that, answers take a few seconds.

@@ -8,8 +8,8 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButt
                                QStackedWidget, QTextBrowser, QVBoxLayout, QWidget)
 
 from locallibrary import db, ingest, rag, thumbnails
-from locallibrary.ui.widgets import (ORIGIN_LABELS, SOURCE, TYPE_LABELS, CoverImage, DropZone, SourceTile,
-                                     type_badge)
+from locallibrary.ui.widgets import (ORIGIN_LABELS, SOURCE, TYPE_LABELS, CoverImage, DropZone, SourceShelf,
+                                     SourceSpine, type_badge)
 from locallibrary.workers import run_in_background
 
 SAVE_DELAY_MS = 1000
@@ -39,8 +39,8 @@ def answer_markdown(answer) -> str:
     return "\n".join(lines)
 
 
-def tile_list(parent_layout: QVBoxLayout, heading: str, object_name: str) -> tuple[QWidget, QVBoxLayout]:
-    """A titled, scrollable column for BookTiles. Returns (container, tile layout)."""
+def shelf_list(parent_layout: QVBoxLayout, heading: str, object_name: str) -> tuple[QWidget, SourceShelf]:
+    """A titled, scrollable shelf of SourceSpines. Returns (container, shelf)."""
     container = QWidget()
     container.setObjectName(object_name)
     layout = QVBoxLayout(container)
@@ -48,21 +48,15 @@ def tile_list(parent_layout: QVBoxLayout, heading: str, object_name: str) -> tup
     title = QLabel(heading)
     title.setObjectName("ColumnHeading")
     layout.addWidget(title)
-    inner = QWidget()
-    tiles = QVBoxLayout(inner)
-    tiles.addStretch()
+    shelf = SourceShelf()
     scroll = QScrollArea()
+    scroll.setObjectName("ShelfScroll")
     scroll.setWidgetResizable(True)
     scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    scroll.setWidget(inner)
+    scroll.setWidget(shelf)
     layout.addWidget(scroll)
     parent_layout.addWidget(container)
-    return container, tiles
-
-
-def clear_tiles(tiles: QVBoxLayout) -> None:
-    while tiles.count() > 1:
-        tiles.takeAt(0).widget().deleteLater()
+    return container, shelf
 
 
 class ResearchPage(QWidget):
@@ -112,7 +106,7 @@ class ResearchPage(QWidget):
 
         # --- left strip: this book's sources ---
         left = QVBoxLayout()
-        self.strip, self.strip_tiles = tile_list(left, "Sources", "SourceStrip")
+        self.strip, self.strip_shelf = shelf_list(left, "Sources", "SourceStrip")
         self.strip.setFixedWidth(210)
         body.addLayout(left)
 
@@ -208,7 +202,7 @@ class ResearchPage(QWidget):
 
         # --- right: similar sources ---
         right = QVBoxLayout()
-        self.similar_panel, self.similar_tiles = tile_list(right, "Similar Sources", "SimilarPanel")
+        self.similar_panel, self.similar_shelf = shelf_list(right, "Similar Sources", "SimilarPanel")
         self.similar_panel.setFixedWidth(230)
         self.similar_hint = QLabel("Drag one onto the page to add it.")
         self.similar_hint.setObjectName("ColumnMessage")
@@ -242,17 +236,17 @@ class ResearchPage(QWidget):
     def _reload_sources(self) -> None:
         self.book = db.get_shelf_book(self.book.id)
         self.sources = db.get_sources(self.book.source_ids)
-        clear_tiles(self.strip_tiles)
+        self.strip_shelf.clear()
         for source in self.sources:
-            tile = SourceTile(source)
-            tile.clicked.connect(lambda sid: self.open_source(sid, 1))
-            tile.set_cover(self.covers.get(source.id))
-            self.strip_tiles.insertWidget(self.strip_tiles.count() - 1, tile)
+            spine = SourceSpine(source)
+            spine.clicked.connect(lambda sid: self.open_source(sid, 1))
+            spine.set_cover(self.covers.get(source.id))
+            self.strip_shelf.add(spine)
         self._highlight_strip()
         self._load_covers(self.sources)
 
     def _load_covers(self, sources) -> None:
-        """Render missing covers in the background, then show them on every tile and the Now-reading bar."""
+        """Render missing covers in the background, then show them on every spine and the Now-reading bar."""
         missing = [s for s in sources if s.id not in self.covers and s.downloaded]
         if not missing:
             return
@@ -262,11 +256,9 @@ class ResearchPage(QWidget):
             self.covers.update(found)
             if load_id != self.load_id:
                 return
-            for tiles in (self.strip_tiles, self.similar_tiles):
-                for i in range(tiles.count() - 1):
-                    tile = tiles.itemAt(i).widget()
-                    if tile.item_id in found:
-                        tile.set_cover(found[tile.item_id])
+            for spine in self.strip_shelf.spines() + self.similar_shelf.spines():
+                if spine.item_id in found:
+                    spine.set_cover(found[spine.item_id])
             if self.source and self.source.id in found and self.now_cover:
                 self.now_cover.set_cover(found[self.source.id])
 
@@ -295,11 +287,10 @@ class ResearchPage(QWidget):
         self.now_reading.show()
 
     def _highlight_strip(self) -> None:
-        for i in range(self.strip_tiles.count() - 1):
-            tile = self.strip_tiles.itemAt(i).widget()
-            tile.setProperty("selected", bool(self.source and tile.item_id == self.source.id))
-            tile.style().unpolish(tile)
-            tile.style().polish(tile)
+        for spine in self.strip_shelf.spines():
+            spine.setProperty("selected", bool(self.source and spine.item_id == self.source.id))
+            spine.style().unpolish(spine)
+            spine.style().polish(spine)
 
     def _show_message(self, text: str) -> None:
         self.message.setText(text)
@@ -448,18 +439,17 @@ class ResearchPage(QWidget):
         if not self.source or not self.book:
             return
         load_id, source_id = self.load_id, self.source.id
-        clear_tiles(self.similar_tiles)
+        self.similar_shelf.clear()
         self.similar_hint.setText("Looking for similar sources…")
 
         def done(found):
             if load_id != self.load_id or not self.source or self.source.id != source_id:
                 return
-            clear_tiles(self.similar_tiles)
+            self.similar_shelf.clear()
             for source in found:
-                tile = SourceTile(source)
-                tile.set_cover(self.covers.get(source.id))
-                tile.setToolTip(f"{tile.toolTip()}\n\n{source.description[:300]}")
-                self.similar_tiles.insertWidget(self.similar_tiles.count() - 1, tile)
+                spine = SourceSpine(source, reason=source.description[:300])
+                spine.set_cover(self.covers.get(source.id))
+                self.similar_shelf.add(spine)
             self._load_covers(found)
             self.similar_hint.setText("Drag one onto the page to add it." if found else "No similar sources found.")
 

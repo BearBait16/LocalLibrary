@@ -1,5 +1,5 @@
 """Search page: topic in, recommended sources out, drag the ones you want, Done makes a shelf book."""
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton,
                                QScrollArea, QVBoxLayout, QWidget)
 
@@ -7,14 +7,25 @@ from locallibrary import db, ingest, recommend
 from locallibrary.config import config
 from locallibrary.models import TEXTBOOK, Source
 from locallibrary.sources import gemini_web
-from locallibrary.ui.widgets import SOURCE, DropZone, SourceCard
+from locallibrary.ui.falling import FallLayer
+from locallibrary.ui.widgets import SOURCE, DropZone, SourceShelf, SourceSpine
 from locallibrary.workers import run_in_background
 
 READY, DOWNLOADING, FAILED = "ready", "downloading", "failed"
+DETAILS_HINT = "Click a book to see why it was picked. Double-click or drag it to add it."
+
+
+def shelf_scroll(shelf: SourceShelf) -> QScrollArea:
+    scroll = QScrollArea()
+    scroll.setObjectName("ShelfScroll")
+    scroll.setWidgetResizable(True)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    scroll.setWidget(shelf)
+    return scroll
 
 
 class ResultColumn(QWidget):
-    """A heading over a scrollable list of SourceCards."""
+    """A heading over a scrollable shelf of SourceSpines, with a line showing the clicked book's reason."""
 
     def __init__(self, heading: str):
         super().__init__()
@@ -23,27 +34,39 @@ class ResultColumn(QWidget):
         title = QLabel(heading)
         title.setObjectName("ColumnHeading")
         layout.addWidget(title)
-        inner = QWidget()
-        inner.setObjectName("ResultList")
-        self.cards = QVBoxLayout(inner)
-        self.cards.addStretch()
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(inner)
-        layout.addWidget(scroll)
+        self.message = QLabel("")
+        self.message.setObjectName("ColumnMessage")
+        self.message.setWordWrap(True)
+        self.message.hide()
+        layout.addWidget(self.message)
+        self.shelf = SourceShelf()
+        self.scroll = shelf_scroll(self.shelf)
+        layout.addWidget(self.scroll, 1)
+        self.details = QLabel("")
+        self.details.setObjectName("SpineDetails")
+        self.details.setWordWrap(True)
+        layout.addWidget(self.details)
 
     def clear(self) -> None:
-        while self.cards.count() > 1:
-            self.cards.takeAt(0).widget().deleteLater()
+        self.shelf.clear()
+        self.message.hide()
+        self.details.setText("")
 
-    def add(self, card: SourceCard) -> None:
-        self.cards.insertWidget(self.cards.count() - 1, card)
+    def add(self, spine: SourceSpine) -> None:
+        self.shelf.add(spine)
+        spine.clicked.connect(lambda _: self.show_details(spine))
+        self.details.setText(DETAILS_HINT)
+
+    def show_details(self, spine: SourceSpine) -> None:
+        for other in self.shelf.spines():
+            other.setProperty("selected", other is spine)
+            other.style().unpolish(other)
+            other.style().polish(other)
+        self.details.setText(f"{spine.source.title}\n{spine.reason or 'No reason given.'}")
 
     def set_message(self, text: str) -> None:
-        label = QLabel(text)
-        label.setObjectName("ColumnMessage")
-        label.setWordWrap(True)
-        self.cards.insertWidget(self.cards.count() - 1, label)
+        self.message.setText(text)
+        self.message.show()
 
 
 class SearchPage(QWidget):
@@ -55,7 +78,7 @@ class SearchPage(QWidget):
         self.pending = 0
         self.query = ""
         self.known: dict[int, Source] = {}  # every source shown in the results
-        self.chosen: dict[int, SourceCard] = {}  # source id -> card in the drop zone (drop order)
+        self.chosen: dict[int, SourceSpine] = {}  # source id -> spine on the picks shelf (drop order)
         self.state: dict[int, str] = {}
 
         layout = QVBoxLayout(self)
@@ -114,6 +137,8 @@ class SearchPage(QWidget):
         right = QVBoxLayout()
         self.zone = DropZone(SOURCE, "Drag here!")
         self.zone.dropped.connect(self.add_source)
+        self.picks = SourceShelf()
+        self.zone.content.addWidget(shelf_scroll(self.picks), 1)
         self.done_button = QPushButton("Done")
         self.done_button.setObjectName("DoneButton")
         self.done_button.setEnabled(False)
@@ -122,11 +147,17 @@ class SearchPage(QWidget):
         right.addWidget(self.done_button)
         body.addLayout(right, 1)
         layout.addLayout(body, 1)
+        self.fall_layer = FallLayer(self)  # results drop in from the top of the page
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fall_layer.setGeometry(self.rect())
 
     # --- search -------------------------------------------------------------
 
     def reset(self) -> None:
         self.search_id += 1
+        self.fall_layer.finish()
         self.pending = 0
         self.query = ""
         self.query_box.clear()
@@ -155,6 +186,7 @@ class SearchPage(QWidget):
             return
         self.search_id += 1
         search_id = self.search_id
+        self.fall_layer.finish()
         self.query = query
         self.show_error("")
         self.local_column.clear()
@@ -176,18 +208,18 @@ class SearchPage(QWidget):
         if self.pending <= 0:
             self._set_busy(False, "Drag the sources you want into the box, then press Done.")
 
-    def _result_card(self, source: Source, reason: str) -> SourceCard:
+    def _result_spine(self, source: Source, reason: str) -> SourceSpine:
         self.known[source.id] = source
-        card = SourceCard(source, reason)
-        card.double_clicked.connect(self.add_source)
-        return card
+        spine = SourceSpine(source, reason)
+        spine.double_clicked.connect(self.add_source)
+        return spine
 
     def _show_recommendation(self, search_id: int, rec) -> None:
         if search_id != self.search_id:
             return
         sources = ([rec.textbook] if rec.textbook else []) + rec.papers
-        for source in sources:
-            self.local_column.add(self._result_card(source, rec.reasons.get(source.id, "")))
+        self._drop_in(search_id, self.local_column,
+                      [self._result_spine(source, rec.reasons.get(source.id, "")) for source in sources])
         if not sources:
             self.local_column.set_message("Nothing found in the library for this topic yet.")
         elif rec.used_fallback:
@@ -197,11 +229,17 @@ class SearchPage(QWidget):
     def _show_web(self, search_id: int, found) -> None:
         if search_id != self.search_id:
             return
-        for source, reason in found:
-            self.web_column.add(self._result_card(source, reason))
+        self._drop_in(search_id, self.web_column, [self._result_spine(source, reason) for source, reason in found])
         if not found:
             self.web_column.set_message("Gemini didn't return any usable sources.")
         self._one_done()
+
+    def _drop_in(self, search_id: int, column: ResultColumn, spines: list[SourceSpine]) -> None:
+        """Put the spines on the column's shelf, then (once they're laid out) drop them in from the top."""
+        for spine in spines:
+            column.add(spine)
+        QTimer.singleShot(0, lambda: search_id == self.search_id and self.isVisible()
+                          and self.fall_layer.drop(spines, column.scroll.viewport()))
 
     def _search_failed(self, search_id: int, what: str, message: str) -> None:
         if search_id != self.search_id:
@@ -218,45 +256,47 @@ class SearchPage(QWidget):
         if source is None:
             return
         self.zone.placeholder.hide()
-        card = SourceCard(source, removable=True)
-        card.remove_requested.connect(self.remove_source)
-        self.zone.content.addWidget(card)
-        self.chosen[source_id] = card
+        spine = SourceSpine(source, removable=True)
+        spine.remove_requested.connect(self.remove_source)
+        self.picks.add(spine)
+        self.chosen[source_id] = spine
         if source.downloaded:
             self.state[source_id] = READY
-            card.set_status("Ready")
+            spine.set_status("Ready")
         else:
             self.state[source_id] = DOWNLOADING
-            card.set_progress(0, "Starting download…")
+            spine.set_progress(0, "Starting download…")
             run_in_background(ingest.ingest, source,
-                              on_progress=lambda pct, msg: self._ingest_progress(source_id, card, pct, msg),
-                              on_done=lambda result: self._ingest_done(source_id, card, result),
-                              on_error=lambda msg: self._ingest_failed(source_id, card, msg))
+                              on_progress=lambda pct, msg: self._ingest_progress(source_id, spine, pct, msg),
+                              on_done=lambda result: self._ingest_done(source_id, spine, result),
+                              on_error=lambda msg: self._ingest_failed(source_id, spine, msg))
         self._update_done()
 
-    def _ingest_progress(self, source_id: int, card: SourceCard, percent: int, message: str) -> None:
-        if self.chosen.get(source_id) is card:
-            card.set_progress(percent, message)
+    def _ingest_progress(self, source_id: int, spine: SourceSpine, percent: int, message: str) -> None:
+        if self.chosen.get(source_id) is spine:
+            spine.set_progress(percent, message)
 
-    def _ingest_done(self, source_id: int, card: SourceCard, source: Source) -> None:
+    def _ingest_done(self, source_id: int, spine: SourceSpine, source: Source) -> None:
         self.known[source_id] = source
-        if self.chosen.get(source_id) is card:
+        if self.chosen.get(source_id) is spine:
             self.state[source_id] = READY
-            card.source = source
-            card.set_status("Ready")
+            spine.source = source
+            spine.set_status("Ready")
             self._update_done()
 
-    def _ingest_failed(self, source_id: int, card: SourceCard, message: str) -> None:
-        if self.chosen.get(source_id) is card:
+    def _ingest_failed(self, source_id: int, spine: SourceSpine, message: str) -> None:
+        if self.chosen.get(source_id) is spine:
             self.state[source_id] = FAILED
-            card.set_status(f"Couldn't add this source: {message}", error=True)
+            spine.set_status(f"Couldn't add this source: {message}", error=True)
+            self.show_error(f"Couldn't add “{spine.source.title}”: {message}")
             self._update_done()
 
     def remove_source(self, source_id: int) -> None:
-        card = self.chosen.pop(source_id, None)
+        spine = self.chosen.pop(source_id, None)
         self.state.pop(source_id, None)
-        if card:
-            card.deleteLater()
+        if spine:
+            self.picks.remove(spine)
+            spine.deleteLater()
         if not self.chosen:
             self.zone.placeholder.show()
         self._update_done()

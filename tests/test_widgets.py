@@ -62,3 +62,31 @@ def test_spine_title_is_shortened_to_fit(app):
     spine.set_look(2, "bands")  # more room, still the same title underneath
     assert spine.title == long_title
     assert BookSpine(2, "Stats", 0, "label").title_label.text() == "Stats"
+
+
+def test_shelf_slots_wrap_onto_next_shelf():
+    from locallibrary.ui.widgets import SourceShelf, shelf_slots
+    slots = shelf_slots(5, 2 * SourceShelf.MARGIN + 2 * SourceShelf.SLOT_WIDTH)
+    assert [y for _, y in slots] == [SourceShelf.TOP] * 2 + [SourceShelf.TOP + SourceShelf.ROW_HEIGHT] * 2 + \
+        [SourceShelf.TOP + 2 * SourceShelf.ROW_HEIGHT]
+    assert slots[0][0] == slots[2][0] == SourceShelf.MARGIN
+    assert shelf_slots(3, 10) == [(SourceShelf.MARGIN, SourceShelf.TOP + i * SourceShelf.ROW_HEIGHT) for i in range(3)]
+
+
+def test_source_spine_drags_as_source_and_shows_status(app):
+    from locallibrary.models import Source
+    from locallibrary.ui.widgets import SourceShelf, SourceSpine
+    spine = SourceSpine(Source("A very long textbook title indeed", "textbook", "openstax", "u", id=4),
+                        reason="Good start", removable=True)
+    assert decode(encode(spine.kind, spine.item_id)) == (SOURCE, 4)
+    assert "Good start" in spine.toolTip() and spine.remove_button is not None
+    spine.set_progress(40, "Downloading")
+    assert spine.progress_bar.isVisibleTo(spine) and spine.progress_bar.value() == 40
+    spine.set_status("Couldn't add", error=True)
+    assert not spine.progress_bar.isVisibleTo(spine) and spine.property("error") is True
+    shelf = SourceShelf()
+    shelf.resize(400, 300)
+    shelf.add(spine)
+    assert shelf.spines() == [spine] and spine.parent() is shelf
+    shelf.remove(spine)
+    assert shelf.spines() == []

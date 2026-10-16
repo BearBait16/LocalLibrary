@@ -1,8 +1,12 @@
-"""Reusable drag-and-drop widgets: BookTile, DropZone, SourceCard."""
+"""Reusable drag-and-drop widgets: BookTile, BookSpine, SourceSpine, SourceShelf, DropZone, ShelfRow."""
+import html
+
 from PySide6.QtCore import QMimeData, QPoint, QRect, Qt, Signal
 from PySide6.QtGui import QDrag, QFontMetrics, QPixmap
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton,
                                QVBoxLayout, QWidget)
+
+from locallibrary.looks import source_look
 
 MIME_TYPE = "application/x-locallibrary"
 SHELF_BOOK = "shelf_book"
@@ -215,86 +219,149 @@ class BookSpine(BookTile):
         self.layout_.addSpacing(10)
 
 
-class SourceTile(BookTile):
-    """A compact, draggable source tile: cover image, type badge and title."""
-
-    TITLE_ROOM = (112, 54)  # px for the title beside the cover
-
-    def __init__(self, source, parent=None):
-        super().__init__(SOURCE, source.id, source.title, parent)
-        self.setObjectName("SourceTile")
-        self.source = source
-        self.layout_.removeWidget(self.title_label)
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        self.cover = CoverImage(source.source_type, 54, 72)
-        row.addWidget(self.cover)
-        text = QVBoxLayout()
-        text.setSpacing(2)
-        text.addWidget(type_badge(source.source_type), 0, Qt.AlignmentFlag.AlignLeft)
-        self.title_label.setParent(self)
-        self.title_label.setObjectName("SourceTileTitle")
-        text.addWidget(self.title_label)
-        text.addStretch()
-        row.addLayout(text, 1)
-        self.layout_.addLayout(row)
-        self.layout_.setContentsMargins(6, 6, 6, 6)
-        self.title_label.ensurePolished()
-        width, height = self.TITLE_ROOM
-        self.title_label.setText(fit_text(source.title, QFontMetrics(self.title_label.font()), width, height))
-        self.setToolTip(f"{source.title}\n{TYPE_LABELS.get(source.source_type, '')} · "
-                        f"{ORIGIN_LABELS.get(source.origin, source.origin)}")
-
-    def set_cover(self, path: str | None) -> None:
-        self.cover.set_cover(path)
+TYPE_CAP_ROOM = 18  # px of title room a source spine's type cap takes
 
 
-class SourceCard(BookTile):
-    """A draggable source card with title, type, reason and a status/progress line."""
+class SourceSpine(BookSpine):
+    """A source drawn as a book spine: design from its type, color from its id, and a type cap at the
+    bottom. Picks also get a remove button and show download progress / errors on the spine."""
 
     remove_requested = Signal(int)
+    TYPE_CAPS = {"textbook": "TEXTBOOK", "research_paper": "PAPER", "web_article": "WEB"}
+    TITLE_ROOM = {design: (w, h - TYPE_CAP_ROOM) for design, (w, h) in BookSpine.TITLE_ROOM.items()}
 
     def __init__(self, source, reason: str = "", removable: bool = False, parent=None):
-        super().__init__(SOURCE, source.id, source.title, parent)
-        self.setObjectName("SourceCard")
-        self.source = source
-        header = QHBoxLayout()
-        self.type_label = QLabel(TYPE_LABELS.get(source.source_type, source.source_type))
-        self.type_label.setObjectName("CardType")
-        header.addWidget(self.type_label)
-        header.addStretch()
-        if removable:
-            remove = QPushButton("✕")
-            remove.setObjectName("CardRemove")
-            remove.setToolTip("Remove")
-            remove.clicked.connect(lambda: self.remove_requested.emit(self.item_id))
-            header.addWidget(remove)
-        self.layout_.insertLayout(0, header)
-        if reason:
-            self.reason_label = QLabel(reason)
-            self.reason_label.setObjectName("CardReason")
-            self.reason_label.setWordWrap(True)
-            self.layout_.addWidget(self.reason_label)
-        self.status_label = QLabel("Downloaded" if source.downloaded else "")
-        self.status_label.setObjectName("CardStatus")
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setObjectName("CardProgress")
+        self.source, self.reason = source, reason
+        self.cover_path: str | None = None
+        self.status = ""
+        color, design = source_look(source.id, source.source_type)
+        super().__init__(source.id, source.title, color, design, parent)
+        self.kind = SOURCE
+        self.progress_bar = QProgressBar(self)  # positioned by hand over the bottom of the spine
+        self.progress_bar.setObjectName("SpineProgress")
         self.progress_bar.setTextVisible(False)
         self.progress_bar.hide()
-        self.layout_.addWidget(self.status_label)
-        self.layout_.addWidget(self.progress_bar)
+        self.remove_button = None
+        if removable:
+            self.remove_button = QPushButton("✕", self)
+            self.remove_button.setObjectName("SpineRemove")
+            self.remove_button.setToolTip("Remove")
+            self.remove_button.clicked.connect(lambda: self.remove_requested.emit(self.item_id))
+        self._update_tooltip()
+
+    def set_look(self, color: int, design: str) -> None:
+        super().set_look(color, design)
+        cap = QLabel(self.TYPE_CAPS.get(self.source.source_type, "SOURCE"))
+        cap.setObjectName("SpineTypeCap")
+        cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cap.setProperty("sourceType", self.source.source_type)
+        self.layout_.addWidget(cap)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.progress_bar.setGeometry(5, self.height() - 26, self.width() - 10, 6)
+        if self.remove_button:
+            self.remove_button.setGeometry(self.width() - 22, 3, 19, 19)
+
+    def set_cover(self, path: str | None) -> None:
+        self.cover_path = path
+        self._update_tooltip()
 
     def set_progress(self, percent: int, message: str) -> None:
         self.progress_bar.show()
         self.progress_bar.setValue(percent)
-        self.status_label.setText(message)
+        self.status = message
+        self._update_tooltip()
 
     def set_status(self, message: str, error: bool = False) -> None:
         self.progress_bar.hide()
-        self.status_label.setText(message)
-        self.status_label.setProperty("error", error)
-        self.status_label.style().unpolish(self.status_label)
-        self.status_label.style().polish(self.status_label)
+        self.status = message
+        self.setProperty("error", error)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self._update_tooltip()
+
+    def _update_tooltip(self) -> None:
+        source = self.source
+        parts = []
+        if self.cover_path:
+            parts.append(f'<img src="{html.escape(self.cover_path)}" height="140"><br>')
+        parts.append(f"<b>{html.escape(source.title)}</b><br>{TYPE_LABELS.get(source.source_type, '')} · "
+                     f"{html.escape(ORIGIN_LABELS.get(source.origin, source.origin))}")
+        if self.status:
+            parts.append(f"<br>{html.escape(self.status)}")
+        if self.reason:
+            parts.append(f"<br><br><i>{html.escape(self.reason)}</i>")
+        self.setToolTip(f"<qt>{''.join(parts)}</qt>")
+
+
+def shelf_slots(count: int, width: int) -> list[tuple[int, int]]:
+    """Top-left corner of each spine on a SourceShelf `width` px wide: left to right, then the next shelf down."""
+    per_row = max(1, (width - 2 * SourceShelf.MARGIN) // SourceShelf.SLOT_WIDTH)
+    return [(SourceShelf.MARGIN + (i % per_row) * SourceShelf.SLOT_WIDTH,
+             (i // per_row) * SourceShelf.ROW_HEIGHT + SourceShelf.TOP)
+            for i in range(count)]
+
+
+class SourceShelf(QWidget):
+    """Source spines standing on as many shelves as they need. Goes inside a QScrollArea."""
+
+    SPINE_SIZE = (76, 160)  # matches QFrame#ShelfSpine in style.qss
+    SLOT_WIDTH = 84
+    MARGIN = 6
+    TOP = 6
+    BOARD_HEIGHT = 10
+    ROW_HEIGHT = 186  # top gap + spine + board + gap to the next shelf
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("SourceShelf")
+        self._spines: list[SourceSpine] = []
+        self._boards: list[QFrame] = []
+        self._relayout()
+
+    def spines(self) -> list[SourceSpine]:
+        return list(self._spines)
+
+    def add(self, spine: SourceSpine) -> None:
+        spine.setParent(self)
+        self._spines.append(spine)
+        spine.show()
+        self._relayout()
+
+    def remove(self, spine: SourceSpine) -> None:
+        if spine in self._spines:
+            self._spines.remove(spine)
+            spine.setParent(None)
+            self._relayout()
+
+    def clear(self) -> None:
+        for spine in self._spines:
+            spine.deleteLater()
+        self._spines.clear()
+        self._relayout()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._relayout()
+
+    def _relayout(self) -> None:
+        slots = shelf_slots(len(self._spines), self.width())
+        rows = max(1, (slots[-1][1] // self.ROW_HEIGHT + 1) if slots else 1)
+        while len(self._boards) < rows:
+            board = QFrame(self)
+            board.setObjectName("SourceShelfBoard")
+            board.show()
+            self._boards.append(board)
+        while len(self._boards) > rows:
+            self._boards.pop().deleteLater()
+        width, height = self.SPINE_SIZE
+        for row, board in enumerate(self._boards):
+            board.setGeometry(0, row * self.ROW_HEIGHT + self.TOP + height, self.width(), self.BOARD_HEIGHT)
+            board.lower()
+        for spine, (x, y) in zip(self._spines, slots):
+            spine.setGeometry(x, y, width, height)
+        self.setMinimumHeight(rows * self.ROW_HEIGHT)
 
 
 class DropZone(QFrame):

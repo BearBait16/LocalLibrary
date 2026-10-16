@@ -59,7 +59,7 @@ locallibrary/
   recommend.py rag.py workers.py main.py looks.py thumbnails.py
   sources/  openstax.py openstax_seed.json openalex.py gemini_web.py
   ui/       style.qss main_window.py library_page.py
-            search_page.py research_page.py widgets.py look_dialog.py
+            search_page.py research_page.py widgets.py look_dialog.py falling.py
 tests/               # conftest.py has the test-DB fixture
 ```
 

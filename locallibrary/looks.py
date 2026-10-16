@@ -20,3 +20,12 @@ def pick_look(existing: list[tuple[int, str]], neighbor: tuple[int, str] | None 
     color = _least_used(list(range(len(SPINE_COLORS))), colors, avoid_color)
     design = _least_used(SPINE_DESIGNS, designs, avoid_design)
     return color, design
+
+
+# Source spines: the design says what kind of source it is, the color tells sources apart.
+SOURCE_DESIGNS = {"textbook": "bands", "research_paper": "label", "web_article": "ribbed"}
+
+
+def source_look(source_id: int | None, source_type: str) -> tuple[int, str]:
+    """A source's spine look: always the same for the same source."""
+    return (source_id or 0) % len(SPINE_COLORS), SOURCE_DESIGNS.get(source_type, "two_tone")

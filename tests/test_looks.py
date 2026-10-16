@@ -22,3 +22,11 @@ def test_sequence_of_books_all_differ_from_left_neighbor():
     for _ in range(20):
         looks.append(pick_look(looks, looks[-1] if looks else None))
     assert all(a[0] != b[0] and a[1] != b[1] for a, b in zip(looks, looks[1:]))
+
+
+def test_source_look_is_stable_and_shows_type():
+    from locallibrary.looks import source_look
+    assert source_look(9, "textbook") == source_look(9, "textbook") == (1, "bands")
+    assert source_look(9, "research_paper")[1] == "label"
+    assert source_look(9, "web_article")[1] == "ribbed"
+    assert source_look(None, "other") == (0, "two_tone")
