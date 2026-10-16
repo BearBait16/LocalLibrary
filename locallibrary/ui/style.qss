@@ -1,0 +1,307 @@
+/* All app styling lives here. Widgets set objectNames; nothing hard-codes colors or fonts.
+   Plain on purpose: the UI will be redesigned later. */
+
+QWidget {
+    font-size: 11pt;
+}
+
+QLabel#PageHeading {
+    font-size: 18pt;
+    font-weight: bold;
+    padding: 8px 0;
+}
+
+QLabel#ColumnHeading {
+    font-size: 13pt;
+    font-weight: bold;
+}
+
+QLabel#ErrorMessage {
+    color: #b00020;
+}
+
+QFrame#BookTile, QFrame#SourceCard {
+    background: #ffffff;
+    border: 1px solid #c8c8c8;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QFrame#BookTile:hover, QFrame#SourceCard:hover {
+    border-color: #4a7bd0;
+}
+
+QFrame#BookTile[selected="true"] {
+    border: 2px solid #4a7bd0;
+}
+
+/* --- Book spines: colors by palette index (see looks.SPINE_COLORS), designs by child parts --- */
+QFrame#ShelfSpine {
+    background: #6b2d2d;
+    border: 1px solid rgba(0, 0, 0, 120);
+    border-radius: 3px;
+    min-width: 76px;
+    max-width: 76px;
+    min-height: 160px;
+    max-height: 160px;
+}
+
+QFrame#ShelfSpine[spineColor="0"] { background: #7a2630; }  /* Oxblood */
+QFrame#ShelfSpine[spineColor="1"] { background: #1f3a68; }  /* Navy */
+QFrame#ShelfSpine[spineColor="2"] { background: #2f5d3a; }  /* Forest */
+QFrame#ShelfSpine[spineColor="3"] { background: #b5871e; }  /* Mustard */
+QFrame#ShelfSpine[spineColor="4"] { background: #5b2e63; }  /* Plum */
+QFrame#ShelfSpine[spineColor="5"] { background: #1f6b6b; }  /* Teal */
+QFrame#ShelfSpine[spineColor="6"] { background: #5a3a22; }  /* Chocolate */
+QFrame#ShelfSpine[spineColor="7"] { background: #46505c; }  /* Slate */
+
+QFrame#ShelfSpine:hover {
+    border: 1px solid #f5e6b8;
+}
+
+QFrame#ShelfSpine[selected="true"] {
+    border: 3px solid #ffd966;
+}
+
+QFrame#ShelfSpine QLabel#TileTitle {
+    color: #fdf6e3;
+    font-size: 9pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+QFrame#SpineBand {
+    border: none;
+    background: rgba(222, 184, 92, 230);
+    min-height: 3px;
+    max-height: 3px;
+}
+
+QFrame#SpineLabel {
+    background: #efe6cc;
+    border: 1px solid rgba(0, 0, 0, 90);
+    border-radius: 2px;
+}
+
+QFrame#SpineLabel QLabel#TileTitle {
+    color: #2b2420;
+}
+
+QFrame#SpineTone {
+    background: rgba(0, 0, 0, 80);
+    border: none;
+    min-height: 38px;
+    max-height: 38px;
+}
+
+QFrame#SpineTone[edge="top"] {
+    border-bottom: 2px solid rgba(222, 184, 92, 200);
+}
+
+QFrame#SpineTone[edge="bottom"] {
+    border-top: 2px solid rgba(222, 184, 92, 200);
+}
+
+QFrame#SpineRib {
+    border: none;
+    background: rgba(0, 0, 0, 110);
+    border-bottom: 1px solid rgba(255, 255, 255, 70);
+    min-height: 4px;
+    max-height: 4px;
+}
+
+QLabel#TileTitle {
+    font-weight: bold;
+}
+
+QLabel#CardType {
+    color: #555555;
+    font-size: 9pt;
+    text-transform: uppercase;
+}
+
+QLabel#CardReason {
+    color: #333333;
+}
+
+QLabel#CardStatus {
+    color: #2e7d32;
+    font-size: 9pt;
+}
+
+QLabel#CardStatus[error="true"] {
+    color: #b00020;
+}
+
+QPushButton#CardRemove {
+    border: none;
+    padding: 0 4px;
+}
+
+QFrame#DropZone {
+    border: 2px dashed #9aa5b1;
+    border-radius: 8px;
+    background: #f5f7fa;
+    min-height: 120px;
+}
+
+QFrame#DropZone[dragOver="true"] {
+    border-color: #4a7bd0;
+    background: #e8f0fc;
+}
+
+QLabel#DropPlaceholder {
+    color: #7a8794;
+    font-size: 14pt;
+}
+
+QFrame#Shelf {
+    border: none;  /* needed for Qt to draw the bottom-only border */
+    border-bottom: 10px solid #5c3a1a;
+    background: rgba(40, 25, 12, 60);
+}
+
+QFrame#Shelf[dropState="over"] {
+    background: rgba(255, 236, 179, 70);
+}
+
+QFrame#Shelf[dropState="full"] {
+    background: rgba(176, 0, 32, 70);
+}
+
+QFrame#DropMarker {
+    background: #ffd966;
+    border-radius: 2px;
+}
+
+QWidget#LibraryPage {
+    background: #f0ebe3;
+}
+
+QTextBrowser#RagAnswer {
+    background: #fafafa;
+}
+
+QPushButton:disabled {
+    color: #9a9a9a;
+}
+
+QLabel#ColumnMessage, QLabel#StatusText {
+    color: #555555;
+}
+
+QPushButton#DoneButton, QPushButton#SearchButton {
+    font-weight: bold;
+    padding: 6px 18px;
+}
+
+QFrame#ViewerZone {
+    border: 2px solid transparent;
+    background: transparent;
+    min-height: 0;
+}
+
+QFrame#ViewerZone[dragOver="true"] {
+    border: 2px dashed #4a7bd0;
+}
+
+QLabel#ViewerMessage {
+    color: #555555;
+    font-size: 13pt;
+}
+
+QTextBrowser#ArticleView {
+    font-size: 12pt;
+    padding: 12px;
+}
+
+QPushButton:checked {
+    background: #dce6f7;
+}
+
+QScrollArea#ShelfScroll, QWidget#Shelves {
+    background: transparent;
+    border: none;
+}
+
+QLabel#ShelfMessage {
+    color: #555555;
+    font-size: 13pt;
+    background: rgba(255, 255, 255, 180);
+    padding: 12px;
+    border-radius: 6px;
+}
+
+QFrame#OpenZone {
+    background: rgba(255, 255, 255, 200);
+}
+
+QWidget#LibraryPage QLabel#PageHeading {
+    background: rgba(255, 255, 255, 210);
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+
+/* --- Research page: source tiles, covers, type badges, Now reading --- */
+QFrame#SourceTile {
+    background: #ffffff;
+    border: 1px solid #c8c8c8;
+    border-radius: 6px;
+}
+
+QFrame#SourceTile:hover {
+    border-color: #4a7bd0;
+}
+
+QFrame#SourceTile[selected="true"] {
+    border: 2px solid #4a7bd0;
+    background: #eef3fc;
+}
+
+QLabel#SourceTileTitle {
+    font-size: 9pt;
+    font-weight: bold;
+}
+
+QLabel#SourceCover {
+    border: 1px solid rgba(0, 0, 0, 60);
+    background: #ffffff;
+}
+
+QLabel#SourceCover[placeholder="true"] {
+    color: #ffffff;
+    font-size: 18pt;
+    font-weight: bold;
+}
+
+QLabel#SourceCover[placeholder="true"][sourceType="textbook"] { background: #2f5d8a; }
+QLabel#SourceCover[placeholder="true"][sourceType="research_paper"] { background: #6b4a8a; }
+QLabel#SourceCover[placeholder="true"][sourceType="web_article"] { background: #2e7d5b; }
+
+QLabel#SourceBadge {
+    color: #ffffff;
+    font-size: 8pt;
+    font-weight: bold;
+    border-radius: 3px;
+    padding: 1px 6px;
+}
+
+QLabel#SourceBadge[sourceType="textbook"] { background: #2f5d8a; }
+QLabel#SourceBadge[sourceType="research_paper"] { background: #6b4a8a; }
+QLabel#SourceBadge[sourceType="web_article"] { background: #2e7d5b; }
+
+QFrame#NowReading {
+    background: #f4f6fa;
+    border: 1px solid #d5dbe5;
+    border-radius: 6px;
+}
+
+QLabel#NowReadingTitle {
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+QLabel#NowReadingMeta {
+    color: #555555;
+    font-size: 9pt;
+}
